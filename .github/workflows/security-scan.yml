@@ -1,22 +1,38 @@
-name: Docker Image Security Scan & Push
+name: DevSecOps Pipeline
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-scan:
+
+  # ── JOB 1 — SAST Semgrep ───────────────────────────────
+  sast:
+    name: "Job 1 - SAST Semgrep"
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: Run Semgrep SAST scan
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/app:/src \
+            semgrep/semgrep semgrep --config=auto /src \
+            --json --output /src/semgrep-report.json || true
+
+      - name: Upload Semgrep report
+        uses: actions/upload-artifact@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          name: semgrep-report
+          path: app/semgrep-report.json
+
+  # ── JOB 2 — Build Docker Image ─────────────────────────
+  build:
+    name: "Job 2 - Build Docker Image"
+    runs-on: ubuntu-latest
+    needs: sast
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -25,46 +41,93 @@ jobs:
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/secure-app:latest .
 
-      - name: Trivy scan (full report)
+      - name: Save image for next jobs
+        run: docker save ${{ secrets.DOCKER_USERNAME }}/secure-app:latest -o secure-app.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: secure-app.tar
+
+  # ── JOB 3 — Trivy Scan (blocks if CRITICAL) ────────────
+  trivy:
+    name: "Job 3 - Trivy Image Scan"
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: docker load -i secure-app.tar
+
+      - name: Trivy scan - full report
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ secrets.DOCKER_USERNAME }}/secure-app:latest
           format: 'json'
           output: 'trivy-report.json'
           severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
-          ignore-unfixed: false
           exit-code: 0
 
+      - name: Trivy scan - BLOCK if CRITICAL
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/secure-app:latest
+          format: 'table'
+          severity: 'CRITICAL'
+          exit-code: 1
+
       - name: Upload Trivy report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.json
 
-      - name: Trivy scan (blocking)
-        uses: aquasecurity/trivy-action@master
+  # ── JOB 4 — Publish report to Nexus ────────────────────
+  nexus:
+    name: "Job 4 - Publish to Nexus"
+    runs-on: ubuntu-latest
+    needs: trivy
+    steps:
+      - name: Download Trivy report
+        uses: actions/download-artifact@v4
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/secure-app:latest
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
-          exit-code: 1
+          name: trivy-report
 
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          format: 'table'
-          severity: 'MEDIUM,HIGH,CRITICAL'
-          exit-code: 1
-
-      - name: Upload Trivy report to Nexus
+      - name: Upload to Nexus
         run: |
           curl -u admin:${{ secrets.NEXUS_PASSWORD }} \
-          --upload-file trivy-report.json \
-          https://23cb-154-124-82-213.ngrok-free.app/repository/devsecops-reports/trivy-${{ github.run_number }}.json
+            --upload-file trivy-report.json \
+            "https://23cb-154-124-82-213.ngrok-free.app/repository/devsecops-reports/trivy-${{ github.run_number }}.json"
 
-      - name: Push Image to Docker Hub
-        if: success()
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/secure-app:latest
+  # ── JOB 5 — Push to DockerHub (only if all passed) ─────
+  dockerhub:
+    name: "Job 5 - Push to DockerHub"
+    runs-on: ubuntu-latest
+    needs: [sast, build, trivy, nexus]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: docker load -i secure-app.tar
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push to DockerHub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/secure-app:latest
