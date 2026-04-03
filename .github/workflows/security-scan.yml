@@ -105,7 +105,7 @@ jobs:
         run: |
           curl -u admin:${{ secrets.NEXUS_PASSWORD }} \
             --upload-file trivy-report.json \
-            "http://localhost:8081/#admin/repository/repositories/trivy-${{ github.run_number }}.json"
+            "https://23cb-154-124-82-213.ngrok-free.app/#admin/repository/repositories/trivy-${{ github.run_number }}.json"
 
   # ── JOB 5 — Push to DockerHub (only if all passed) ─────
   dockerhub:
