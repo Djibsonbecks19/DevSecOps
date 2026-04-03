@@ -1,0 +1,19 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  sast:
+    name: Security Scan (Semgrep)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Scan
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" semgrep/semgrep \
+          semgrep scan --config=auto --error --text /src
