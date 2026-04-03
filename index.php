@@ -1,5 +1,4 @@
 <?php
-// Connexion simulée (pas de DB pour simplifier)
 $valid_user = "admin";
 $valid_pass = password_hash("password", PASSWORD_BCRYPT);
 
