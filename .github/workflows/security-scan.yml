@@ -58,6 +58,12 @@ jobs:
           severity: 'MEDIUM,HIGH,CRITICAL'
           exit-code: 1
 
+      - name: Upload Trivy report to Nexus
+        run: |
+          curl -u admin:${{ secrets.NEXUS_PASSWORD }} \
+          --upload-file trivy-report.json \
+          https://23cb-154-124-82-213.ngrok-free.app/repository/devsecops-reports/trivy-${{ github.run_number }}.json
+
       - name: Push Image to Docker Hub
         if: success()
         run: |
