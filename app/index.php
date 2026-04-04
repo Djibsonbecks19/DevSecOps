@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if ($username === 'admin' && $password === 'admin') {
+    if ($username == 'admin' && $password == 'admin') {
         $success = 'Welcome back, <strong>admin</strong>! Redirecting...';
     } else {
         $error = 'Invalid username or password. Please try again.';
