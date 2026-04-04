@@ -111,7 +111,7 @@ jobs:
         run: |
           curl -u admin:${{ secrets.NEXUS_PASSWORD }} \
             --upload-file trivy-report.json \
-            "https://3303-154-124-82-213.ngrok-free.app/repository/devsecops-report/trivy-${{ github.run_number }}.json"
+            "https://a571-2001-4278-11-e7c6-55db-58ef-dab3-3663.ngrok-free.app/repository/devsecops-report/trivy-${{ github.run_number }}.json"
 
 
 
