@@ -6,9 +6,7 @@ on:
 
 jobs:
 
-# ─────────────────────────────────────────────
-# 1. SAST (Semgrep)
-# ─────────────────────────────────────────────
+
   sast:
     name: "Job 1 - SAST Semgrep"
     runs-on: ubuntu-latest
@@ -30,9 +28,7 @@ jobs:
           path: app/semgrep-report.json
 
 
-# ─────────────────────────────────────────────
-# 2. Build Docker Image
-# ─────────────────────────────────────────────
+
   build:
     name: "Job 2 - Build Docker Image"
     runs-on: ubuntu-latest
@@ -55,9 +51,7 @@ jobs:
           path: secure-app.tar
 
 
-# ─────────────────────────────────────────────
-# 3. Trivy Scan
-# ─────────────────────────────────────────────
+
   trivy:
     name: "Job 3 - Trivy Scan"
     runs-on: ubuntu-latest
@@ -101,9 +95,7 @@ jobs:
           path: trivy-report.json
 
 
-# ─────────────────────────────────────────────
-# 4. Nexus Upload (FIXED)
-# ─────────────────────────────────────────────
+
   nexus:
     name: "Job 4 - Publish to Nexus"
     runs-on: ubuntu-latest
@@ -119,12 +111,10 @@ jobs:
         run: |
           curl -u admin:${{ secrets.NEXUS_PASSWORD }} \
             --upload-file trivy-report.json \
-            "https://23cb-154-124-82-213.ngrok-free.app/repository/devsecops-report/trivy-${{ github.run_number }}.json"
+            "https://3303-154-124-82-213.ngrok-free.app/repository/devsecops-report/trivy-${{ github.run_number }}.json"
 
 
-# ─────────────────────────────────────────────
-# 5. DockerHub Push
-# ─────────────────────────────────────────────
+
   dockerhub:
     name: "Job 5 - Push to DockerHub"
     runs-on: ubuntu-latest
